@@ -18,6 +18,17 @@
 // CD and ISO 9660 reader namespace
 namespace cd {
 
+/// Structure for a mode 1 sector (used in regular files)
+	typedef struct {
+		unsigned char	sync[12];	/// Sync pattern (usually 00 FF FF FF FF FF FF FF FF FF FF 00)
+		unsigned char	addr[3];	/// Sector address (see below for encoding details)
+		unsigned char	mode;		/// Mode (usually 1 for Mode 1 sectors)
+		unsigned char	data[2048];	/// Data (form 1)
+		unsigned char	edc[4];		/// Error-detection code (CRC32 of data area)
+		unsigned char   zero[8];    /// Zero-filled for Mode 1 sectors
+		unsigned char	ecc[276];	/// Error-correction code (uses Reed-Solomon ECC algorithm)
+	} SECTOR_M1;
+
 	/// Structure for a mode 2 form 1 sector (used in regular files)
 	typedef struct {
 		unsigned char	sync[12];	/// Sync pattern (usually 00 FF FF FF FF FF FF FF FF FF FF 00)

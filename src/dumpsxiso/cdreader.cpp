@@ -46,6 +46,7 @@ bool cd::IsoReader::Open(const fs::path& fileName)
     currentByte		= 0;
     currentSector	= 0;
 
+    sectorM1 = (cd::SECTOR_M1*)sectorBuff;
     sectorM2F1 = (cd::SECTOR_M2F1*)sectorBuff;
     sectorM2F2 = (cd::SECTOR_M2F2*)sectorBuff;
 
@@ -61,13 +62,16 @@ size_t cd::IsoReader::ReadBytes(void* ptr, size_t bytes, bool singleSector)
 
 	size_t bytesRead = 0;
     char* const dataPtr = (char*)ptr;
-	constexpr size_t DATA_SIZE = sizeof(sectorM2F1->data);
+	constexpr size_t DATA_SIZE = sizeof(sectorM2F1->data); //mode 1 and mode2 form 1 have the same data size
 
     while(bytes > 0)
 	{
 		const size_t toRead = std::min(DATA_SIZE - currentByte, bytes);
 
-        memcpy(dataPtr+bytesRead, &sectorM2F1->data[currentByte], toRead);
+        if (sectorM1->mode == '\1')
+			memcpy(dataPtr+bytesRead, &sectorM1->data[currentByte], toRead);
+		else
+			memcpy(dataPtr+bytesRead, &sectorM2F1->data[currentByte], toRead);
 
 		currentByte += toRead;
 		bytesRead += toRead;
@@ -158,7 +162,7 @@ void cd::IsoReader::SkipBytes(size_t bytes, bool singleSector) {
 		return;
 	}
 
-	constexpr size_t DATA_SIZE = sizeof(sectorM2F1->data);
+	constexpr size_t DATA_SIZE = sizeof(sectorM2F1->data); //mode 1 and mode2 form 1 have the same data size
 
     while(bytes > 0) {
 
@@ -190,6 +194,7 @@ int cd::IsoReader::SeekToSector(int sector) {
 	currentSector = sector;
 	currentByte = 0;
 
+	sectorM1   = (cd::SECTOR_M1*)sectorBuff;
 	sectorM2F1 = (cd::SECTOR_M2F1*)sectorBuff;
     sectorM2F2 = (cd::SECTOR_M2F2*)sectorBuff;
 
@@ -209,6 +214,7 @@ size_t cd::IsoReader::SeekToByte(size_t offs) {
 	currentSector = sector;
 	currentByte = offs%CD_SECTOR_SIZE;
 
+	sectorM1   = (cd::SECTOR_M1*)sectorBuff;
 	sectorM2F1 = (cd::SECTOR_M2F1*)sectorBuff;
     sectorM2F2 = (cd::SECTOR_M2F2*)sectorBuff;
 
@@ -240,7 +246,8 @@ bool cd::IsoReader::PrepareNextSector()
 		return false;
     }
 
-    sectorM2F1 = (cd::SECTOR_M2F1*)sectorBuff;
+    sectorM1   = (cd::SECTOR_M1*)sectorBuff;
+	sectorM2F1 = (cd::SECTOR_M2F1*)sectorBuff;
 	sectorM2F2 = (cd::SECTOR_M2F2*)sectorBuff;
 	return true;
 }
@@ -317,20 +324,24 @@ cd::IsoDirEntries::IsoDirEntries(ListView<Entry> view)
 void cd::IsoDirEntries::ReadDirEntries(cd::IsoReader* reader, int lba, int sectors, bool skipFolders)
 {
 	size_t numEntries = 0; // Used to skip the first two entries, . and ..
+	//printf("reading directory at lba %d and %d sectors long\n", lba, sectors);
     for (int sec = 0; sec < sectors; sec++)
     {
         reader->SeekToSector(lba + sec);
 		while (true)
 		{
+			//printf("ReadDirEntries\tRead new entry\n");
 			auto entry = ReadEntry(reader);
 			if (!entry)
 			{
+				//printf("ReadDirEntries\tEnd of table or sector\n");
 				// Either end of the table, or end of sector
 				break;
 			}
 
 			if (numEntries++ >= 2 && !(skipFolders && entry.value().entry.flags & 0x2))
 			{
+				//printf("ReadDirEntries\tEmplace entry: %s\n", entry.value().identifier.data());
 				dirEntryList.emplace(std::move(entry.value()));
 			}
 		}
@@ -345,6 +356,7 @@ void cd::IsoDirEntries::ReadDirEntries(cd::IsoReader* reader, int lba, int secto
 
 std::optional<cd::IsoDirEntries::Entry> cd::IsoDirEntries::ReadEntry(cd::IsoReader* reader) const
 {
+	//printf("ReadEntry\tRead new entry\n");
 	Entry entry;
 
 	// Read 33 byte directory entry
@@ -353,10 +365,17 @@ std::optional<cd::IsoDirEntries::Entry> cd::IsoDirEntries::ReadEntry(cd::IsoRead
 	// The file entry table usually ends with null bytes so break if we reached that area
 	if (bytesRead != sizeof(entry.entry) || entry.entry.entryLength == 0)
 		return std::nullopt;
+	//printf("ReadEntry\tbytesRead: 0x%x\n", bytesRead);
+	//printf("ReadEntry\tentLength: 0x%x\n", entry.entry.entryLength);
+	//printf("ReadEntry\textLength: 0x%x\n", entry.entry.extLength);
+	//printf("         \tentryOffs: 0x%x\n", entry.entry.entryOffs.lsb);
+	//printf("         \tentrySize: 0x%x\n", entry.entry.entrySize.lsb);
+	//printf("         \tidentiLen: 0x%x\n", entry.entry.identifierLen);
 
 	// Read identifier string
 	entry.identifier.resize(entry.entry.identifierLen);
 	reader->ReadBytes(entry.identifier.data(), entry.entry.identifierLen, true);
+	//printf("         \tentryIden: %s\n", entry.identifier.data());
 
 	// Strip trailing zeroes, if any
 	entry.identifier.resize(strlen(entry.identifier.c_str()));
@@ -368,12 +387,26 @@ std::optional<cd::IsoDirEntries::Entry> cd::IsoDirEntries::ReadEntry(cd::IsoRead
     }
 
 	// Read XA attribute data
-	reader->ReadBytes(&entry.extData, sizeof(entry.extData), true);
+	//reader->ReadBytes(&entry.extData, sizeof(entry.extData), true);
+	entry.extData = {0x0000, 0x0000, 0x0000, 0x0000, 0x00, 0x00};
+
+	// Since dumpsxiso uses the XA fields (and Mode 1 discs don't have them)
+	// let's hack in attributes for directories and files.
+	if (entry.entry.flags & 0x2)
+	{
+		// Directory
+		entry.extData.attributes = 0x8800;
+	}
+	else
+	{
+		// File
+		entry.extData.attributes = 0x0800;
+	}
 
 	// XA attributes are big endian, swap them
-	entry.extData.attributes = SwapBytes16(entry.extData.attributes);
-	entry.extData.ownergroupid = SwapBytes16(entry.extData.ownergroupid);
-	entry.extData.owneruserid = SwapBytes16(entry.extData.owneruserid);
+	//entry.extData.attributes = SwapBytes16(entry.extData.attributes);
+	//entry.extData.ownergroupid = SwapBytes16(entry.extData.ownergroupid);
+	//entry.extData.owneruserid = SwapBytes16(entry.extData.owneruserid);
 
 	return entry;
 }

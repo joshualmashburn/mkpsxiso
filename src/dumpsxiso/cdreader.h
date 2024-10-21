@@ -20,6 +20,8 @@ namespace cd {
         FILE*		filePtr = nullptr;
         // Sector buffer size
         unsigned char sectorBuff[CD_SECTOR_SIZE] {};
+        // Mode 1 sector struct for simplified reading of sectors (usually points to sectorBuff[])
+        SECTOR_M1* sectorM1 = nullptr;
         // Mode 2 Form 1 sector struct for simplified reading of sectors (usually points to sectorBuff[])
         SECTOR_M2F1* sectorM2F1 = nullptr;
         // Mode 2 Form 2 sector struct for simplified reading of sectors (usually points to sectorBuff[])

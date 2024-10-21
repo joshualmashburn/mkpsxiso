@@ -931,6 +931,8 @@ void ParseISO(cd::IsoReader& reader) {
         printf("   No files to find.\n");
         return;
     }
+	else
+		printf("   Number of directories: %lu\n", numEntries);
 
 	// Prepare output directories
 	for(size_t i=0; i<numEntries; i++)
