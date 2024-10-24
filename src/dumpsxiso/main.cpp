@@ -184,7 +184,7 @@ std::unique_ptr<cd::ISO_LICENSE> ReadLicense(cd::IsoReader& reader) {
 	auto license = std::make_unique<cd::ISO_LICENSE>();
 
 	reader.SeekToSector(0);
-	reader.ReadBytesXA(license->data, sizeof(license->data));
+	reader.ReadBytes(license->data, sizeof(license->data));
 
 	return license;
 }
@@ -776,7 +776,7 @@ tinyxml2::XMLElement* WriteXMLEntry(const cd::IsoDirEntries::Entry& entry, tinyx
 			newelement->SetAttribute(xml::attrib::ENTRY_TYPE, "data");
 		}
 	}
-	WriteOptionalXMLAttribs(newelement, entry, entryType, attributeCounters);
+	//WriteOptionalXMLAttribs(newelement, entry, entryType, attributeCounters);
 	return dirElement;
 }
 
@@ -785,12 +785,12 @@ void WriteXMLGap(const unsigned int numSectors, tinyxml2::XMLElement* dirElement
 	if (numSectors < 1) {
 		return;
 	}
-	cd::SECTOR_M2F1 sector;
+	cd::SECTOR_M1 sector;
 	reader.SeekToSector(startSector);
-	reader.ReadBytesXA(sector.subHead, 2336);
+	reader.ReadBytes(sector.data, 2336);
 	tinyxml2::XMLElement* newelement = dirElement->InsertNewChildElement("dummy");
 	newelement->SetAttribute(xml::attrib::NUM_DUMMY_SECTORS, numSectors);
-	newelement->SetAttribute(xml::attrib::ENTRY_TYPE, sector.subHead[2]);
+	newelement->SetAttribute(xml::attrib::ENTRY_TYPE, 0x08);
 	if (param::pathTable) {
 		newelement->SetAttribute(xml::attrib::OFFSET, startSector);
 	}
@@ -1011,7 +1011,7 @@ void ParseISO(cd::IsoReader& reader) {
 			}
 
 			// Create <default_attributes> now so it lands before the directory tree
-			tinyxml2::XMLElement* defaultAttributesElement = trackElement->InsertNewChildElement(xml::elem::DEFAULT_ATTRIBUTES);
+			//tinyxml2::XMLElement* defaultAttributesElement = trackElement->InsertNewChildElement(xml::elem::DEFAULT_ATTRIBUTES);
 
 			const fs::path sourcePath = param::outPath.lexically_proximate(xmlPath);
 
@@ -1063,7 +1063,7 @@ void ParseISO(cd::IsoReader& reader) {
 			}
 
 			tinyxml2::XMLElement *dirtree = trackElement->FirstChildElement(xml::elem::DIRECTORY_TREE);
-			SimplifyDefaultXMLAttributes(dirtree, EstablishXMLAttributeDefaults(defaultAttributesElement, attributeCounters));
+			//SimplifyDefaultXMLAttributes(dirtree, EstablishXMLAttributeDefaults(defaultAttributesElement, attributeCounters));
 
 			// write CDDA tracks
 			tinyxml2::XMLNode *modifyProject = trackElement->Parent();
@@ -1117,29 +1117,13 @@ void ParseISO(cd::IsoReader& reader) {
 				tracknum++;
 			}
 
-			// HACK until some better way to get track sizes is implemented, like getting them from a .cue file
-			// Check for a EoF gap, usually 150 sectors for single track games
-			unsigned int totalLenLBA = descriptor.volumeSize.lsb;
-			if (currentLBA < totalLenLBA) {
-				int numSectors = totalLenLBA - currentLBA;
-				if (numSectors == 150) {
-					WriteXMLGap(numSectors, dirtree, currentLBA, reader);
-					printf(	"Adding %d dummy sectors...\n", numSectors);
-				}
-				else if (numSectors < 150) {
-					WriteXMLGap(numSectors, dirtree, currentLBA, reader);
-					printf(	"Adding %d dummy sectors...\n\n"
-							"Warning: This %d sectors gap could mean that there are missing files or the image was previously modified.\n"
-							"\t If there are DA files, check that the dummy is before them, otherwise the built image will be corrupted.\n", numSectors, numSectors);
-				}
-				else {
-					WriteXMLGap(150, dirtree, currentLBA, reader);
-					printf( "Adding 150 dummy sectors...\n\n"
-							"Warning: There is still a gap of %d sectors at the end.\n"
-							"\t This could mean that there are missing files or tracks.\n"
-							"\t Unfortunately, current version can't dump unreferenced tracks.\n", (numSectors - 150));
-				}
-			}
+			// Per Sega CD specs, a 2 second delay is required between the data track and the audio tracks
+			// (150 sectors)
+			//WriteXMLGap(150, dirtree, currentLBA, reader);
+			//printf(	"Adding %d dummy sectors...\n", 150);
+
+			//TODO: implement saving and restoring the last 150 sectors verbatim from the original file
+			// Atlus for sure put in some data in the pregap. Might be copy protection.
 
 			xmldoc.SaveFile(file);
 			fclose(file);

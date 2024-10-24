@@ -26,12 +26,12 @@
 namespace global
 {
 	time_t		BuildTime;
-	bool		xa_edc;
+	bool		xa_edc      = false;
 	int			QuietMode	= false;
 	int			Overwrite	= false;
 
 	int			trackNum	= 1;
-	int			noXA		= false;
+	int			noXA		= true;
 
 	std::optional<bool> new_type;
 	std::optional<std::string> volid_override;
@@ -841,7 +841,7 @@ int Main(int argc, char* argv[])
 			{
 				// Write blank sectors if no license data is to be injected
 				auto appBlankSectors = 
-					writer.GetSectorViewM2F1(0, 16, cd::IsoWriter::EdcEccForm::Form2);
+					writer.GetSectorViewM1(0, 16, cd::IsoWriter::EdcEccForm::Form1);
 				appBlankSectors->WriteBlankSectors(16);
 			}
 

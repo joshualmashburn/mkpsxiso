@@ -75,14 +75,34 @@ static void WriteSectorAddress(uint8_t* output, unsigned int lsn)
 
 void IsoWriter::SectorView::PrepareSectorHeader() const
 {
-	SECTOR_M2F1* sector = static_cast<SECTOR_M2F1*>(m_currentSector);
+	SECTOR_M1* sector = static_cast<SECTOR_M1*>(m_currentSector);
 
 	static constexpr uint8_t SYNC_PATTERN[12] = { 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00 };
 	std::copy(std::begin(SYNC_PATTERN), std::end(SYNC_PATTERN), sector->sync);
+	std::fill(std::begin(sector->zero), std::end(sector->zero), 0);
 
 	WriteSectorAddress(sector->addr, m_currentLBA);
 
-	sector->mode = 2; // Mode 2
+	sector->mode = 1; // Mode 1
+}
+
+void IsoWriter::SectorView::CalculateMode1()
+{
+	SECTOR_M1* sector = static_cast<SECTOR_M1*>(m_currentSector);
+
+	m_checksumJobs.emplace_front(m_threadPool->enqueue([](SECTOR_M1* sector)
+		{
+			// Encode EDC data
+			// ComputeEdcBlock(const uchar *src, size_t len, uchar *dest)
+			EDC_ECC_GEN.ComputeEdcBlock(sector->sync, sizeof(sector->data)+16, sector->edc);
+
+			// Compute ECC P code (172 bytes)
+			static const unsigned char zeroaddress[4] = { 0, 0, 0, 0 };
+			// ComputeEccBlock(const uchar *address, const uchar *src, uint major_count, uint minor_count, uint major_mult, uint minor_inc, uchar *dest)
+			EDC_ECC_GEN.ComputeEccBlock(zeroaddress, sector->data, 86, 24, 2, 86, sector->ecc);
+			// Compute ECC Q code (104 bytes)
+			EDC_ECC_GEN.ComputeEccBlock(zeroaddress, sector->data, 52, 43, 86, 88, sector->ecc+172);
+		}, sector));
 }
 
 void IsoWriter::SectorView::CalculateForm1()
@@ -125,6 +145,130 @@ void IsoWriter::SectorView::WaitForChecksumJobs()
 }
 
 // ======================================================
+
+class SectorViewM1 final : public IsoWriter::SectorView
+{
+private:
+	using SectorType = SECTOR_M1;
+
+public:
+	using IsoWriter::SectorView::SectorView;
+
+	~SectorViewM1() override
+	{
+		if (m_offsetInSector != 0)
+		{
+			NextSector();
+		}
+	}
+
+	void WriteFile(FILE* file) override
+	{
+		SectorType* sector = static_cast<SectorType*>(m_currentSector);
+		const unsigned int lastLBA = m_endLBA - 1;
+
+		while (m_currentLBA < m_endLBA)
+		{
+			PrepareSectorHeader();
+			//SetSubHeader(sector->subHead, m_currentLBA != lastLBA ? m_subHeader : IsoWriter::SubEOF);
+
+			const size_t bytesRead = fread(sector->data, 1, sizeof(sector->data), file);
+			// Fill the remainder of the sector with zeroes if applicable
+			std::fill(std::begin(sector->data) + bytesRead, std::end(sector->data), 0);
+		
+			CalculateMode1();
+
+			// Fill in the 8 zero bytes after edc
+			std::fill(std::begin(sector->zero), std::end(sector->zero), 0);
+
+			m_currentLBA++;
+			m_currentSector = ++sector;
+		}
+	}
+
+	void WriteMemory(const void* memory, size_t size) override
+	{
+		const char* buf = static_cast<const char*>(memory);
+		const unsigned int lastLBA = m_endLBA - 1;
+
+		while (m_currentLBA < m_endLBA && size > 0)
+		{
+			SectorType* sector = static_cast<SectorType*>(m_currentSector);
+
+			if (m_offsetInSector == 0)
+			{
+				PrepareSectorHeader();
+				//SetSubHeader(sector->subHead, m_currentLBA != lastLBA ? m_subHeader : IsoWriter::SubEOF);
+			}
+
+			const size_t memToCopy = std::min(GetSpaceInCurrentSector(), size);
+			std::copy_n(buf, memToCopy, sector->data + m_offsetInSector);
+			
+			size -= memToCopy;
+			buf += memToCopy;
+			m_offsetInSector += memToCopy;
+
+			if (m_offsetInSector >= sizeof(sector->data))
+			{
+				NextSector();
+			}
+		}
+	}
+
+	void WriteBlankSectors(unsigned int count, const unsigned char submode) override
+	{
+		SectorType* sector = static_cast<SectorType*>(m_currentSector);
+
+		while (m_currentLBA < m_endLBA && count > 0)
+		{
+			PrepareSectorHeader();
+			//SetSubHeader(sector->subHead, submode << 16);
+
+			std::fill(std::begin(sector->data), std::end(sector->data), 0);
+			CalculateMode1();
+
+			// Fill in the 8 zero bytes after edc
+			std::fill(std::begin(sector->zero), std::end(sector->zero), 0);
+
+			count--;
+			m_currentLBA++;
+			m_currentSector = ++sector;
+		}
+	}
+
+	size_t GetSpaceInCurrentSector() const override
+	{
+		return sizeof(SectorType::data) - m_offsetInSector;
+	}
+
+	void NextSector() override
+	{
+		// Fill the remainder of the sector with zeroes if applicable
+		SectorType* sector = static_cast<SectorType*>(m_currentSector);
+		std::fill(std::begin(sector->data) + m_offsetInSector, std::end(sector->data), 0);
+		
+		CalculateMode1();
+
+		// Fill in the 8 zero bytes after edc
+		std::fill(std::begin(sector->zero), std::end(sector->zero), 0);
+
+		m_offsetInSector = 0;
+		m_currentLBA++;
+		m_currentSector = sector + 1;
+	}
+
+	void SetSubheader(unsigned int subHead) override
+	{
+		m_subHeader = 0xDEADBEEF;
+	}
+
+	unsigned int m_subHeader = IsoWriter::SubData;
+};
+
+auto IsoWriter::GetSectorViewM1(unsigned int offsetLBA, unsigned int sizeLBA, EdcEccForm edcEccForm) const -> std::unique_ptr<SectorView>
+{
+	return std::make_unique<SectorViewM1>(m_threadPool.get(), m_mmap.get(), offsetLBA, sizeLBA, edcEccForm);
+}
 
 class SectorViewM2F1 final : public IsoWriter::SectorView
 {

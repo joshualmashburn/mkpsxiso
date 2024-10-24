@@ -46,6 +46,7 @@ public:
 	protected:
 		void PrepareSectorHeader() const;
 
+		void CalculateMode1();
 		void CalculateForm1();
 		void CalculateForm2();
 
@@ -81,6 +82,7 @@ public:
 	bool Create(const fs::path& fileName, unsigned int sizeLBA);
 	void Close();
 
+	std::unique_ptr<SectorView> GetSectorViewM1(unsigned int offsetLBA, unsigned int sizeLBA, EdcEccForm edcEccForm) const;
 	std::unique_ptr<SectorView> GetSectorViewM2F1(unsigned int offsetLBA, unsigned int sizeLBA, EdcEccForm edcEccForm) const;
 	std::unique_ptr<SectorView> GetSectorViewM2F2(unsigned int offsetLBA, unsigned int sizeLBA, EdcEccForm edcEccForm) const;
 	std::unique_ptr<RawSectorView> GetRawSectorView(unsigned int offsetLBA, unsigned int sizeLBA) const;
