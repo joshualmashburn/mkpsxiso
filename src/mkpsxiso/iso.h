@@ -24,6 +24,8 @@ namespace iso
 		const char*	DataPreparer;
 		const char*	Application;
 		const char* Copyright;
+		const char* Abstract;
+		const char* Bibliographic;
 		const char* CreationDate;
 		const char* ModificationDate;
 	} IDENTIFIERS;

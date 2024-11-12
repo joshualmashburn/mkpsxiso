@@ -1032,8 +1032,8 @@ void iso::WriteDescriptor(cd::IsoWriter* writer, const iso::IDENTIFIERS& id, con
 	CopyStringPadWithSpaces( isoDescriptor.copyrightFileIdentifier, id.Copyright );
 
 	// Unneeded identifiers
-	CopyStringPadWithSpaces( isoDescriptor.abstractFileIdentifier, nullptr );
-	CopyStringPadWithSpaces( isoDescriptor.bibliographicFilelIdentifier, nullptr );
+	CopyStringPadWithSpaces( isoDescriptor.abstractFileIdentifier, id.Abstract );
+	CopyStringPadWithSpaces( isoDescriptor.bibliographicFilelIdentifier, id.Bibliographic );
 
 	isoDescriptor.volumeCreateDate = GetLongDateFromString(id.CreationDate);
 	isoDescriptor.volumeModifyDate = GetLongDateFromString(id.ModificationDate);
@@ -1058,7 +1058,7 @@ void iso::WriteDescriptor(cd::IsoWriter* writer, const iso::IDENTIFIERS& id, con
 	isoDescriptor.rootDirRecord.entryLength = 34;
 	isoDescriptor.rootDirRecord.extLength	= 0;
 	isoDescriptor.rootDirRecord.entryOffs = cd::SetPair32(
-		18+(pathTableSectors*4) );
+		18+(pathTableSectors*2) );
 	isoDescriptor.rootDirRecord.entrySize = cd::SetPair32(
 		dirTree->CalculateDirEntryLen() );
 	isoDescriptor.rootDirRecord.flags = 0x02;
@@ -1069,11 +1069,9 @@ void iso::WriteDescriptor(cd::IsoWriter* writer, const iso::IDENTIFIERS& id, con
 	isoDescriptor.rootDirRecord.entryDate = root.date;
 
 	isoDescriptor.pathTable1Offs = 18;
-	isoDescriptor.pathTable2Offs = isoDescriptor.pathTable1Offs+
-		pathTableSectors;
-	isoDescriptor.pathTable1MSBoffs = isoDescriptor.pathTable2Offs+1;
-	isoDescriptor.pathTable2MSBoffs =
-		isoDescriptor.pathTable1MSBoffs+pathTableSectors;
+	isoDescriptor.pathTable2Offs = 0; // Sega CD doesn't use the duplicate path tables
+	isoDescriptor.pathTable1MSBoffs = isoDescriptor.pathTable1Offs+1;
+	isoDescriptor.pathTable2MSBoffs = 0;
 	isoDescriptor.pathTable1MSBoffs = SwapBytes32( isoDescriptor.pathTable1MSBoffs );
 	isoDescriptor.pathTable2MSBoffs = SwapBytes32( isoDescriptor.pathTable2MSBoffs );
 
@@ -1106,9 +1104,9 @@ void iso::WriteDescriptor(cd::IsoWriter* writer, const iso::IDENTIFIERS& id, con
 	lpathTable1->WriteMemory(sectorBuff.get(), pathTableSize);
 	currentHeaderLBA += pathTableSectors;
 
-	auto lpathTable2 = writer->GetSectorViewM1(currentHeaderLBA, pathTableSectors + ISOver, cd::IsoWriter::EdcEccForm::Form1);
-	lpathTable2->WriteMemory(sectorBuff.get(), pathTableSize);
-	currentHeaderLBA += pathTableSectors;
+	//auto lpathTable2 = writer->GetSectorViewM1(currentHeaderLBA, pathTableSectors + ISOver, cd::IsoWriter::EdcEccForm::Form1);
+	//lpathTable2->WriteMemory(sectorBuff.get(), pathTableSize);
+	//currentHeaderLBA += pathTableSectors;
 
 	// Generate and write M-path table
 	dirTree->GeneratePathTable( root, sectorBuff.get(), true );
@@ -1116,9 +1114,9 @@ void iso::WriteDescriptor(cd::IsoWriter* writer, const iso::IDENTIFIERS& id, con
 	mpathTable1->WriteMemory(sectorBuff.get(), pathTableSize);
 	currentHeaderLBA += pathTableSectors;
 
-	auto mpathTable2 = writer->GetSectorViewM1(currentHeaderLBA, pathTableSectors + ISOver, cd::IsoWriter::EdcEccForm::Form1);
-	mpathTable2->WriteMemory(sectorBuff.get(), pathTableSize);
-	currentHeaderLBA += pathTableSectors;
+	//auto mpathTable2 = writer->GetSectorViewM1(currentHeaderLBA, pathTableSectors + ISOver, cd::IsoWriter::EdcEccForm::Form1);
+	//mpathTable2->WriteMemory(sectorBuff.get(), pathTableSize);
+	//currentHeaderLBA += pathTableSectors;
 }
 
 unsigned char* iso::PathTableClass::GenTableData(unsigned char* buff, bool msb)

@@ -53,6 +53,8 @@ namespace attrib
 	constexpr const char* PUBLISHER = "publisher";
 	constexpr const char* DATA_PREPARER = "data_preparer";
 	constexpr const char* COPYRIGHT = "copyright";
+	constexpr const char* ABSTRACT = "abstract";
+	constexpr const char* BIBLIOGRAPHIC = "bibliographic";
 	constexpr const char* CREATION_DATE = "creation_date";
 	constexpr const char* MODIFICATION_DATE = "modification_date";
 

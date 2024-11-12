@@ -936,6 +936,8 @@ int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const fs::path&
 		isoIdentifiers.Application	= identifierElement->Attribute(xml::attrib::APPLICATION);
 		isoIdentifiers.DataPreparer	= identifierElement->Attribute(xml::attrib::DATA_PREPARER);
 		isoIdentifiers.Copyright	= identifierElement->Attribute(xml::attrib::COPYRIGHT);
+		isoIdentifiers.Abstract		= identifierElement->Attribute(xml::attrib::ABSTRACT);
+		isoIdentifiers.Bibliographic	= identifierElement->Attribute(xml::attrib::BIBLIOGRAPHIC);
 		isoIdentifiers.CreationDate	= identifierElement->Attribute(xml::attrib::CREATION_DATE);
 		isoIdentifiers.ModificationDate = identifierElement->Attribute(xml::attrib::MODIFICATION_DATE);
 
@@ -997,6 +999,10 @@ int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const fs::path&
 					isoIdentifiers.DataPreparer		= str;
 				if( str = identifierElement->Attribute(xml::attrib::COPYRIGHT) )
 					isoIdentifiers.Copyright		= str;
+				if( str = identifierElement->Attribute(xml::attrib::ABSTRACT) )
+					isoIdentifiers.Abstract			= str;
+				if( str = identifierElement->Attribute(xml::attrib::BIBLIOGRAPHIC) )
+					isoIdentifiers.Bibliographic	= str;
 				if( str = identifierElement->Attribute(xml::attrib::CREATION_DATE) )
 					isoIdentifiers.CreationDate		= str;
 				if( str = identifierElement->Attribute(xml::attrib::MODIFICATION_DATE) )
@@ -1059,6 +1065,16 @@ int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const fs::path&
 			{
 				printf( "      Copyright    : %s\n",
 					isoIdentifiers.Copyright );
+			}
+			if ( isoIdentifiers.Abstract != nullptr )
+			{
+				printf( "      Abstract     : %s\n",
+					isoIdentifiers.Abstract );
+			}
+			if ( isoIdentifiers.Bibliographic != nullptr )
+			{
+				printf( "      Bibliographic: %s\n",
+					isoIdentifiers.Bibliographic );
 			}
 			if ( isoIdentifiers.CreationDate != nullptr )
 			{
@@ -1202,7 +1218,7 @@ int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const fs::path&
 	int pathTableLen = dirTree->CalculatePathTableLen(root);
 
 	// 16 license sectors + 2 header sectors
-	const int rootLBA = 18+(GetSizeInSectors(pathTableLen)*4);
+	const int rootLBA = 18+(GetSizeInSectors(pathTableLen)*2);
 
 	// Sort directory entries, calculate tree LBAs and retrieve size of image
 	if (!*global::new_type) {
