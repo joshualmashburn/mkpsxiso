@@ -855,7 +855,8 @@ int Main(int argc, char* argv[])
 			dirTree->WriteDirectoryRecords( &writer, root, root, *global::new_type ? dirTree->GetDirCountTotal() : 0 );
 
 			// Write file system descriptors to finish the image
-	        iso::WriteDescriptor( &writer, isoIdentifiers, root, totalLenLBA );
+			// subtract 150 sectors for the lead-out (not counted in descriptor per Sega)
+	        iso::WriteDescriptor( &writer, isoIdentifiers, root, totalLenLBA - 150);
 
 			if ( !global::QuietMode )
 			{

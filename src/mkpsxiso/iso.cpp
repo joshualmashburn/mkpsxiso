@@ -525,7 +525,12 @@ bool iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& d
 		if (!currentOrParent.has_value())
 		{
 			dirEntry->identifierLen = entry.id.length();
-			strncpy(identifierBuffer, entry.id.c_str(), entry.id.length());
+			if (dirEntry->identifierLen % 2 == 0)
+			{
+				// This wasn't a Sega CD modification; it fixes a bug in the original code :)
+				dirEntry->identifierLen++;
+			}
+			strncpy(identifierBuffer, entry.id.c_str(), dirEntry->identifierLen);
 		}
 		else
 		{

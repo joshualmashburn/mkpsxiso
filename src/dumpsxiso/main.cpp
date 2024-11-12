@@ -1067,6 +1067,11 @@ void ParseISO(cd::IsoReader& reader) {
 			tinyxml2::XMLElement *dirtree = trackElement->FirstChildElement(xml::elem::DIRECTORY_TREE);
 			//SimplifyDefaultXMLAttributes(dirtree, EstablishXMLAttributeDefaults(defaultAttributesElement, attributeCounters));
 
+			// Per Sega CD specs, a 2 second delay is required between the data track and the audio tracks
+			// (150 sectors)
+			WriteXMLGap(150, dirtree, currentLBA, reader);
+			printf(	"Adding %d dummy sectors...\n", 150);
+
 			// write CDDA tracks
 			tinyxml2::XMLNode *modifyProject = trackElement->Parent();
 			tinyxml2::XMLElement *addAfter = trackElement;
@@ -1118,14 +1123,6 @@ void ParseISO(cd::IsoReader& reader) {
 	            addAfter = newtrack;
 				tracknum++;
 			}
-
-			// Per Sega CD specs, a 2 second delay is required between the data track and the audio tracks
-			// (150 sectors)
-			//WriteXMLGap(150, dirtree, currentLBA, reader);
-			//printf(	"Adding %d dummy sectors...\n", 150);
-
-			//TODO: implement saving and restoring the last 150 sectors verbatim from the original file
-			// Atlus for sure put in some data in the pregap. Might be copy protection.
 
 			xmldoc.SaveFile(file);
 			fclose(file);
