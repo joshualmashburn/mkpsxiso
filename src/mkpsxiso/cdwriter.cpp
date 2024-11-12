@@ -99,9 +99,9 @@ void IsoWriter::SectorView::CalculateMode1()
 			// Compute ECC P code (172 bytes)
 			static const unsigned char zeroaddress[4] = { 0, 0, 0, 0 };
 			// ComputeEccBlock(const uchar *address, const uchar *src, uint major_count, uint minor_count, uint major_mult, uint minor_inc, uchar *dest)
-			EDC_ECC_GEN.ComputeEccBlock(zeroaddress, sector->data, 86, 24, 2, 86, sector->ecc);
+			EDC_ECC_GEN.ComputeEccBlock(zeroaddress, sector->addr, 86, 24, 2, 86, sector->ecc);
 			// Compute ECC Q code (104 bytes)
-			EDC_ECC_GEN.ComputeEccBlock(zeroaddress, sector->data, 52, 43, 86, 88, sector->ecc+172);
+			EDC_ECC_GEN.ComputeEccBlock(zeroaddress, sector->addr, 52, 43, 86, 88, sector->ecc+172);
 		}, sector));
 }
 

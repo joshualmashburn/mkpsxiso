@@ -11,13 +11,13 @@ EDCECC::EDCECC() {
 
 	for(i=0; i<256; i++) {
 
-		j = (i<<1)^(i&0x80?0x11D:0);
+		j = (i << 1) ^ (i & 0x80 ? 0x11D : 0);
 		ecc_f_lut[i] = j;
-		ecc_b_lut[i^j] = i;
+		ecc_b_lut[i ^ j] = i;
 		edc = i;
 
 		for(j=0; j<8; j++)
-			edc=(edc>>1)^(edc&1?0xD8018001:0);
+			edc = (edc >> 1) ^ (edc & 1 ? 0xD8018001 : 0);
 
 		edc_lut[i] = edc;
 
@@ -58,12 +58,12 @@ void EDCECC::ComputeEccBlock(const unsigned char *address, const unsigned char *
 
 		for(minor = 0; minor < minor_count; minor++) {
 
-			unsigned char temp;
-			if (index < 4) {
-				temp = address[index];
-			} else {
-				temp = src[index - 4];
-			}
+			unsigned char temp = src[index];
+			// if (index < 4) {
+			// 	temp = address[index];
+			// } else {
+			// 	temp = src[index - 4];
+			// }
 
 			index += minor_inc;
 
