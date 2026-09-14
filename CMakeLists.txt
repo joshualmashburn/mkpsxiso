@@ -4,11 +4,11 @@
 cmake_minimum_required(VERSION 3.20)
 
 project(
-	mkpsxiso
+	mkscdiso
 	LANGUAGES    C CXX
 	VERSION      2.10
-	DESCRIPTION  "PlayStation ISO image maker & dumping tool"
-	HOMEPAGE_URL "https://github.com/Lameguy64/mkpsxiso"
+	DESCRIPTION  "Sega CD ISO image maker & dumping tool"
+	HOMEPAGE_URL "https://github.com/joshualmashburn/mkpsxiso/tree/segacd"
 )
 
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
@@ -84,37 +84,37 @@ find_package(Threads REQUIRED)
 
 ## Executables
 
-add_executable(mkpsxiso
+add_executable(mkscdiso
 	${mkpsxiso_dir}/cdwriter.cpp
 	${mkpsxiso_dir}/edcecc.cpp
 	${mkpsxiso_dir}/iso.cpp
 	${mkpsxiso_dir}/main.cpp
 )
-target_include_directories(mkpsxiso PUBLIC "miniaudio" "ThreadPool")
-target_link_libraries(mkpsxiso tinyxml2 iso_shared Threads::Threads)
+target_include_directories(mkscdiso PUBLIC "miniaudio" "ThreadPool")
+target_link_libraries(mkscdiso tinyxml2 iso_shared Threads::Threads)
 if(MINGW)
-	target_link_libraries(mkpsxiso "-municode")
+	target_link_libraries(mkscdiso "-municode")
 endif()
 
-add_executable(dumpsxiso
+add_executable(dumpscdiso
 	${dumpsxiso_dir}/cdreader.cpp
 	${dumpsxiso_dir}/main.cpp
 )
-target_link_libraries(dumpsxiso tinyxml2 iso_shared)
+target_link_libraries(dumpscdiso tinyxml2 iso_shared)
 if(NOT MKPSXISO_NO_LIBFLAC)
-	target_link_libraries(dumpsxiso FLAC)
+	target_link_libraries(dumpscdiso FLAC)
 else()
-	target_compile_definitions(dumpsxiso PUBLIC MKPSXISO_NO_LIBFLAC)
+	target_compile_definitions(dumpscdiso PUBLIC MKPSXISO_NO_LIBFLAC)
 endif()
 if(MINGW)
-	target_link_libraries(dumpsxiso "-municode")
+	target_link_libraries(dumpscdiso "-municode")
 endif()
 
 ## Installation
 
 include(GNUInstallDirs)
-install(TARGETS mkpsxiso dumpsxiso)
-install(FILES ${PROJECT_SOURCE_DIR}/README.md ${PROJECT_SOURCE_DIR}/LICENSE.md DESTINATION ${CMAKE_INSTALL_DATADIR}/psn00bsdk/doc/mkpsxiso)
+install(TARGETS mkscdiso dumpscdiso)
+install(FILES ${PROJECT_SOURCE_DIR}/README.md ${PROJECT_SOURCE_DIR}/LICENSE.md DESTINATION ${CMAKE_INSTALL_DATADIR}/doc/mkscdiso)
 
 ## CPack (used by GitHub Actions to package releases)
 
@@ -129,13 +129,13 @@ endif()
 set(CPACK_VERBATIM_VARIABLES        ON)
 set(CPACK_ARCHIVE_THREADS           0)
 set(CPACK_PACKAGE_DIRECTORY         ${PROJECT_BINARY_DIR}/packages)
-set(CPACK_PACKAGE_NAME              mkpsxiso)
-set(CPACK_PACKAGE_VENDOR            Lameguy64)
-set(CPACK_PACKAGE_CONTACT           Lameguy64)
+set(CPACK_PACKAGE_NAME              mkscdiso)
+set(CPACK_PACKAGE_VENDOR            JoshTheAggie)
+set(CPACK_PACKAGE_CONTACT           JoshTheAggie)
 set(CPACK_RESOURCE_FILE_README      ${PROJECT_SOURCE_DIR}/README.md)
 set(CPACK_RESOURCE_FILE_LICENSE     ${PROJECT_SOURCE_DIR}/LICENSE.md)
 #set(CPACK_PACKAGE_ICON              ${PROJECT_SOURCE_DIR}/icon.ico)
-set(CPACK_PACKAGE_INSTALL_DIRECTORY mkpsxiso)
+set(CPACK_PACKAGE_INSTALL_DIRECTORY mkscdiso)
 
 set(CPACK_DEBIAN_PACKAGE_DEPENDS  "libc6 (>= 2.28)")
 set(CPACK_DEBIAN_PACKAGE_SECTION  devel)

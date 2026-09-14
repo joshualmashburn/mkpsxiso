@@ -43,7 +43,7 @@ typedef struct {
 
 static const EncodingCodec EncodingCodecs[] = {
 	{"wave", EAF_WAV, ""},
-	{"flac", EAF_FLAC, "ERROR: dumpsxiso was NOT built with libFLAC support!\n"},
+	{"flac", EAF_FLAC, "ERROR: dumpscdiso was NOT built with libFLAC support!\n"},
 	{"pcm",  EAF_PCM, ""}
 };
 
@@ -635,8 +635,8 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 				if (result) {
 					printf("WARNING: The CDDA file %" PRFILESYSTEM_PATH " is out of the iso file bounds.\n", outputPath.lexically_normal().c_str());
 					printf("This usually means that the game has audio tracks, and they are on separate files.\n");
-					printf("As DUMPSXISO does not support dumping from a cue file, you should use an iso file containing all tracks.\n\n");
-					printf("DUMPSXISO will write the file as a dummy (silent) cdda file.\n");
+					printf("As DUMPSCDISO does not support dumping from a cue file, you should use an iso file containing all tracks.\n\n");
+					printf("DUMPSCDISO will write the file as a dummy (silent) cdda file.\n");
 					printf("This is generally fine, when the real CDDA file is also a dummy file.\n");
 					printf("If it is not dummy, you WILL lose this audio data in the rebuilt iso.\n");
 				}
@@ -1148,16 +1148,18 @@ void ParseISO(cd::IsoReader& reader) {
 int Main(int argc, char *argv[])
 {
 	static constexpr const char* HELP_TEXT =
-		"dumpsxiso [-h|--help] [-x <path>] [-s <path>.xml] <isofile>\n\n"
+		"dumpscdiso [-h|--help] [-x <path>] [-s <path>.xml] <isofile>\n\n"
 		"  <isofile> - File name of ISO file (supports any 2352 byte/sector images).\n"
-		"  -x <path> - Optional destination directory for extracted files. (Defaults to dumpsxiso dir)\n"
-		"  -s <path>.xml - Optional XML name/destination of MKPSXISO compatible script for later rebuilding. (Defaults to dumpsxiso dir)\n"
+		"  -x <path> - Optional destination directory for extracted files. (Defaults to dumpscdiso dir)\n"
+		"  -s <path>.xml - Optional XML name/destination of MKSCDISO compatible script for later rebuilding. (Defaults to dumpscdiso dir)\n"
 		"  -S|--sort-by-dir - Outputs a \"pretty\" XML script where entries are grouped in directories, instead of strictly following their original order on the disc.\n"
 		"  -e|--encode <codec> - Codec to encode CDDA/DA audio. wave is default. Supported codecs: " SUPPORTED_CODEC_TEXT "\n"
 		"  -h|--help - Show this help text\n"
 		"  -pt|--path-table - instead of going through the file system, go to every known directory in order; helps with deobfuscating\n";
 
-    printf( "DUMPSXISO " VERSION " - PlayStation ISO dumping tool\n"
+    printf( "DUMPSCDISO " VERSION " - Sega CD ISO dumping tool\n"
+			"2026 JoshTheAggie\n\n"
+			"mkscdiso is a fork of the mkpsxiso project\n"
 			"2017 Meido-Tek Productions (John \"Lameguy\" Wilbert Villamor/Lameguy64)\n"
 			"2020 Phoenix (SadNES cITy)\n"
 			"2021-2022 Silent, Chromaryu, G4Vi, and spicyjpeg\n\n" );
