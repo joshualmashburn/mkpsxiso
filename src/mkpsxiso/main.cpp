@@ -554,7 +554,7 @@ int Main(int argc, char* argv[])
 
 				if ( cuefp )
 				{
-					fprintf( cuefp.get(), "  TRACK %02d MODE2/2352\n", global::trackNum );
+					fprintf( cuefp.get(), "  TRACK %02d MODE1/2352\n", global::trackNum );
 					fprintf( cuefp.get(), "    INDEX 01 00:00:00\n" );
 				}
 
@@ -852,7 +852,7 @@ int Main(int argc, char* argv[])
 			}
 
 			// Write directory entries
-			dirTree->WriteDirectoryRecords( &writer, root, root, *global::new_type ? dirTree->GetDirCountTotal() : 0 );
+			dirTree->WriteDirectoryRecords( &writer, root, root, 0 );
 
 			// Write file system descriptors to finish the image
 			// subtract 150 sectors for the lead-out (not counted in descriptor per Sega)
@@ -1129,7 +1129,7 @@ int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const fs::path&
 				return false;
 
             }
-			else if ( licenseSize != 28032 )
+			else if ( licenseSize != sizeof(cd::ISO_LICENSE) )
 			{
             	if ( !global::QuietMode )
 				{
@@ -1209,6 +1209,29 @@ int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const fs::path&
 		return false;
 	}
 
+	const char* dirDate = directoryTree->Attribute(xml::attrib::DIR_DATE);
+	if ( dirDate != nullptr )
+	{
+		unsigned short year = 0;
+		unsigned char month = 0, day = 0, hour = 0, minute = 0, second = 0, hsec = 0;
+		signed char gmtoffs = 0;
+		const int count = sscanf(dirDate, "%04hu%02hhu%02hhu%02hhu%02hhu%02hhu%02hhu%hhd",
+			&year, &month, &day, &hour, &minute, &second, &hsec, &gmtoffs);
+		if (count >= 6)
+		{
+			root.date.year = (year >= 1900) ? (year - 1900) : year;
+			root.date.month = month;
+			root.date.day = day;
+			root.date.hour = hour;
+			root.date.minute = minute;
+			root.date.second = second;
+			if (count >= 8)
+			{
+				root.date.GMToffs = gmtoffs;
+			}
+		}
+	}
+
 	bool found_da = false;
 	const EntryAttributes defaultAttributes = ReadEntryAttributes(EntryAttributes{}, trackElement->FirstChildElement(xml::elem::DEFAULT_ATTRIBUTES));
 	if ( !ParseDirectory(dirTree, directoryTree, xmlPath, defaultAttributes, found_da) )
@@ -1222,9 +1245,7 @@ int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const fs::path&
 	const int rootLBA = 18+(GetSizeInSectors(pathTableLen)*2);
 
 	// Sort directory entries, calculate tree LBAs and retrieve size of image
-	if (!*global::new_type) {
-		dirTree->SortDirectoryEntries();
-	}
+	dirTree->SortDirectoryEntries();
 	totalLen = dirTree->CalculateTreeLBA(rootLBA);
 
 	if ( !global::QuietMode )

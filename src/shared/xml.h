@@ -37,6 +37,7 @@ namespace attrib
 	constexpr const char* OFFSET = "offs";
 
 	constexpr const char* LICENSE_FILE = "file";
+	constexpr const char* DIR_DATE = "date";
 
 	constexpr const char* GMT_OFFSET = "gmt_offs";
 	constexpr const char* HIDDEN_FLAG = "h_flag";

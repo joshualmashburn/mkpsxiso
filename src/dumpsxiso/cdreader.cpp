@@ -383,8 +383,15 @@ std::optional<cd::IsoDirEntries::Entry> cd::IsoDirEntries::ReadEntry(cd::IsoRead
 	// ECMA-119 9.1.12 - 00 field present only if file identifier length is an even number
 	if ((entry.entry.identifierLen % 2) == 0)
     {
-        reader->SkipBytes(1);
+        reader->SkipBytes(1, true);
     }
+
+	// Skip any remaining bytes in the record (e.g. System Use fields or alignment padding)
+	const size_t bytesConsumed = sizeof(entry.entry) + entry.entry.identifierLen + ((entry.entry.identifierLen % 2 == 0) ? 1 : 0);
+	if (entry.entry.entryLength > bytesConsumed)
+	{
+		reader->SkipBytes(entry.entry.entryLength - bytesConsumed, true);
+	}
 
 	// Read XA attribute data
 	//reader->ReadBytes(&entry.extData, sizeof(entry.extData), true);

@@ -220,9 +220,9 @@ namespace cd {
 
 	} ISO_DESCRIPTOR;
 
-	// License data (just a sequence of 28032 bytes)
+	// License / boot data (16 Mode 1 sectors = 32768 bytes)
 	typedef struct {
-		char data[28032];
+		char data[32768];
 	} ISO_LICENSE;
 
 	// RIFF+WAVE header

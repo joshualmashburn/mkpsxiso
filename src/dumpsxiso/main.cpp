@@ -13,6 +13,7 @@
 #include <vector>
 #include <map>
 #include <memory>
+#include <fstream>
 
 #include "platform.h"
 #include "common.h"
@@ -61,6 +62,8 @@ const unsigned SUPPORTED_CODECS  = (BUILTIN_CODECS | LIBFLAC_SUPPORTED);
 namespace param {
 
     fs::path isoFile;
+    fs::path cueFile;
+    fs::path dataTrackFile;
     fs::path outPath;
     fs::path xmlFile;
     bool outputSortedByDir = false;
@@ -89,6 +92,38 @@ fs::path GetRealDAFilePath(const fs::path& inputPath)
 		return inputPath;
 	}
 	return outputPath;
+}
+
+bool ParseCueFile(const fs::path& cuePath, fs::path& outDataTrack)
+{
+	std::ifstream file(cuePath);
+	if (!file.is_open())
+		return false;
+
+	std::string line;
+	std::string currentFile;
+	while (std::getline(file, line))
+	{
+		size_t filePos = line.find("FILE");
+		if (filePos != std::string::npos)
+		{
+			size_t firstQuote = line.find('"', filePos);
+			size_t secondQuote = line.find('"', firstQuote + 1);
+			if (firstQuote != std::string::npos && secondQuote != std::string::npos)
+			{
+				currentFile = line.substr(firstQuote + 1, secondQuote - firstQuote - 1);
+			}
+		}
+		if (line.find("TRACK") != std::string::npos && line.find("MODE1") != std::string::npos)
+		{
+			if (!currentFile.empty())
+			{
+				outDataTrack = cuePath.parent_path() / fs::u8path(currentFile);
+				return true;
+			}
+		}
+	}
+	return false;
 }
 
 template<size_t N>
@@ -153,32 +188,7 @@ void prepareRIFFHeader(cd::RIFF_HEADER* header, int dataSize) {
 	header->subchunk2Size = dataSize;
 }
 
-// This will ensure that the EDC remains the same as in the original file. Games built with an old, buggy Sony's mastering tool version
-// don't have EDC Form2 data (this can be checked at redump.org) and some games rely on this to do anti-piracy checks like DDR.
-const bool CheckEDCXA(cd::IsoReader &reader) {
-	cd::SECTOR_M2F2 sector;
-	while (reader.ReadBytesXA(sector.data, 2336)) {
- 		if (sector.data[2] & 0x20) {
-			if (sector.data[2332] == 0 && sector.data[2333] == 0 && sector.data[2334] == 0 && sector.data[2335] == 0) {
-				return false;
-			}
-			return true;
-		}
-	}
-	return true;
-}
 
-// Games from 2003 and onwards apparenly has built with a newer Sony's mastering tool.
-// This has different subheader in the descriptor sectors, correct root year and files are sorted by LBA and not by name.
-const bool CheckISOver(cd::IsoReader &reader) {
-	cd::SECTOR_M2F2 sector;
-	reader.SeekToSector(16);
-	reader.ReadBytesXA(sector.data, 2336);
- 	if (sector.data[2] & 0x01) {
-		return false;
-	}
-	return true;
-}
 
 std::unique_ptr<cd::ISO_LICENSE> ReadLicense(cd::IsoReader& reader) {
 	auto license = std::make_unique<cd::ISO_LICENSE>();
@@ -190,6 +200,8 @@ std::unique_ptr<cd::ISO_LICENSE> ReadLicense(cd::IsoReader& reader) {
 }
 
 void SaveLicense(const cd::ISO_LICENSE& license) {
+    std::error_code ec;
+    fs::create_directories(param::outPath, ec);
     const fs::path outputPath = param::outPath / "license_data.dat";
 
 	FILE* outFile = OpenFile(outputPath, "wb");
@@ -734,6 +746,12 @@ tinyxml2::XMLElement* WriteXMLEntry(const cd::IsoDirEntries::Entry& entry, tinyx
 		{
 			// Root directory
 			newelement = dirElement->InsertNewChildElement(xml::elem::DIRECTORY_TREE);
+			char dateBuf[32];
+			snprintf(dateBuf, sizeof(dateBuf), "%04d%02d%02d%02d%02d%02d00%+d",
+				entry.entry.entryDate.year + 1900, entry.entry.entryDate.month, entry.entry.entryDate.day,
+				entry.entry.entryDate.hour, entry.entry.entryDate.minute, entry.entry.entryDate.second,
+				entry.entry.entryDate.GMToffs);
+			newelement->SetAttribute(xml::attrib::DIR_DATE, dateBuf);
 		}
 
 		dirElement = newelement;
@@ -785,9 +803,6 @@ void WriteXMLGap(const unsigned int numSectors, tinyxml2::XMLElement* dirElement
 	if (numSectors < 1) {
 		return;
 	}
-	cd::SECTOR_M1 sector;
-	reader.SeekToSector(startSector);
-	reader.ReadBytes(sector.data, 2336);
 	tinyxml2::XMLElement* newelement = dirElement->InsertNewChildElement("dummy");
 	newelement->SetAttribute(xml::attrib::NUM_DUMMY_SECTORS, numSectors);
 	newelement->SetAttribute(xml::attrib::ENTRY_TYPE, 0x08);
@@ -887,8 +902,7 @@ void ParseISO(cd::IsoReader& reader) {
 
     cd::ISO_DESCRIPTOR descriptor;
 	auto license = ReadLicense(reader);
-	const bool xa_edc = CheckEDCXA(reader);
-	const bool new_type = CheckISOver(reader);
+	SaveLicense(*license);
 
     reader.SeekToSector(16);
     reader.ReadBytes(&descriptor, 2048);
@@ -960,7 +974,6 @@ void ParseISO(cd::IsoReader& reader) {
 		});
 
 	ExtractFiles(reader, entries, param::outPath);
-    SaveLicense(*license);
 
 	if (!param::xmlFile.empty())
 	{
@@ -968,14 +981,16 @@ void ParseISO(cd::IsoReader& reader) {
 		{
 			tinyxml2::XMLDocument xmldoc;
 
+			fs::path dataTrackPath = param::dataTrackFile.empty() ? param::isoFile : param::dataTrackFile;
+			std::string imgName = dataTrackPath.filename().generic_u8string();
+			std::string cueName = param::cueFile.empty() ? (param::isoFile.stem() += ".cue").filename().generic_u8string() : param::cueFile.filename().generic_u8string();
+
 			tinyxml2::XMLElement *baseElement = static_cast<tinyxml2::XMLElement*>(xmldoc.InsertFirstChild(xmldoc.NewElement(xml::elem::ISO_PROJECT)));
-			baseElement->SetAttribute(xml::attrib::IMAGE_NAME, "mkpsxiso.bin");
-			baseElement->SetAttribute(xml::attrib::CUE_SHEET, "mkpsxiso.cue");
+			baseElement->SetAttribute(xml::attrib::IMAGE_NAME, imgName.c_str());
+			baseElement->SetAttribute(xml::attrib::CUE_SHEET, cueName.c_str());
 
 			tinyxml2::XMLElement *trackElement = baseElement->InsertNewChildElement(xml::elem::TRACK);
 			trackElement->SetAttribute(xml::attrib::TRACK_TYPE, "data");
-			trackElement->SetAttribute(xml::attrib::XA_EDC, xa_edc);
-			trackElement->SetAttribute(xml::attrib::NEW_TYPE, new_type);
 
 			{
 				tinyxml2::XMLElement *newElement = trackElement->InsertNewChildElement(xml::elem::IDENTIFIERS);
@@ -1240,11 +1255,22 @@ int Main(int argc, char *argv[])
 		param::xmlFile = param::isoFile.stem() += ".xml";
 	}
 
+	if (param::isoFile.extension() == ".cue")
+	{
+		param::cueFile = param::isoFile;
+		if (!ParseCueFile(param::cueFile, param::dataTrackFile))
+		{
+			printf("ERROR: Could not find MODE1 data track in %" PRFILESYSTEM_PATH "...\n", param::cueFile.lexically_normal().c_str());
+			return EXIT_FAILURE;
+		}
+	}
+
 	cd::IsoReader reader;
 
-	if (!reader.Open(param::isoFile)) {
+	fs::path fileToOpen = param::dataTrackFile.empty() ? param::isoFile : param::dataTrackFile;
+	if (!reader.Open(fileToOpen)) {
 
-		printf("ERROR: Cannot open file %" PRFILESYSTEM_PATH "...\n", param::isoFile.lexically_normal().c_str());
+		printf("ERROR: Cannot open file %" PRFILESYSTEM_PATH "...\n", fileToOpen.lexically_normal().c_str());
 		return EXIT_FAILURE;
 
 	}
